@@ -76,3 +76,4 @@ if __name__ == '__main__':
     model = DocProj().cuda()
     res = model(inp)
     print(res.shape)
+
