@@ -6,3 +6,9 @@ from .SauvolaNet import SauvolaNet
 from .DeepOtsu import DeepOtsu
 from .DEGAN import DEGAN
 from .DocNLC import DocNLC
+from .UDoc_GAN import UDoc_GAN
+from .DocProj import DocProj
+from .GAN_HTR import GAN_HTR
+from .GCDRNet import GCDRNet
+from .illtrtemplate import illtrtemplate
+from .DocTr import DocTr

@@ -284,7 +284,7 @@ class IllTr_Net(nn.Module):
         return x
 
 
-def DocTr(**kwargs):
+def illtrtemplate(**kwargs):
     model = IllTr_Net(
         patch_size=4, depth=6, num_heads=8, ffn_ratio=4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
@@ -293,7 +293,7 @@ def DocTr(**kwargs):
 
 
 if __name__ == '__main__':
-    model = DocTr().cuda()
+    model = illtrtemplate().cuda()
     t = torch.randn(1, 3, 128, 128).cuda()
     out = model(t)
     print(out.shape)
