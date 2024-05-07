@@ -8,7 +8,7 @@ class DEGAN(nn.Module):
         
         # Encoder
         self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 64, kernel_size=3, padding=1),
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True)
@@ -99,7 +99,7 @@ class DEGAN(nn.Module):
             nn.ReLU(inplace=True)
         )
         
-        self.conv10 = nn.Conv2d(2, 1, kernel_size=1)
+        self.conv10 = nn.Conv2d(2, 3, kernel_size=1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -140,7 +140,7 @@ class DEGAN(nn.Module):
     
 
 if __name__ == '__main__':
-    inp = torch.randn(1, 1, 256, 256).cuda()
+    inp = torch.randn(1, 3, 256, 256).cuda()
     model = DEGAN().cuda()
     res = model(inp)
     print(res.shape)
