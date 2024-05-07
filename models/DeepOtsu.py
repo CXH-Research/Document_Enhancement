@@ -10,7 +10,7 @@ class DeepOtsu(nn.Module):
         self.img_cols = img_cols
         self.counter = 0
 
-        self.conv1_1 = nn.Conv2d(1, 64, 3, padding=1)
+        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=1)
         self.bn1_1 = nn.BatchNorm2d(64)
         self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
         self.bn1_2 = nn.BatchNorm2d(64)
@@ -67,7 +67,7 @@ class DeepOtsu(nn.Module):
         self.bn9_2 = nn.BatchNorm2d(64)
         self.conv9_3 = nn.Conv2d(64, 2, 3, padding=1)
         self.bn9_3 = nn.BatchNorm2d(2)
-        self.conv10 = nn.Conv2d(2, 1, 1)
+        self.conv10 = nn.Conv2d(2, 3, 1)
 
     def forward(self, x):
         conv1 = F.relu(self.bn1_1(self.conv1_1(x)))
@@ -117,7 +117,7 @@ class DeepOtsu(nn.Module):
 
 
 if __name__ == '__main__':
-    inp = torch.randn(1, 1, 256, 256).cuda()
+    inp = torch.randn(1, 3, 256, 256).cuda()
     model = DeepOtsu().cuda()
     res = model(inp)
     print(res.shape)
