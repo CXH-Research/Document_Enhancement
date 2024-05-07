@@ -67,7 +67,7 @@ class DocNLC(nn.Module):
         #     self.conv1_1 = nn.Sequential(nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
         #                                  nn.InstanceNorm2d(32, affine=True))
         # else:
-        self.conv0 = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1)
+        self.conv0 = nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1)
 
         self.conv1_1 = AttING(3,32)
         # self.conv1_1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
@@ -105,7 +105,7 @@ class DocNLC(nn.Module):
         self.conv9_1 = nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1)
         self.conv9_2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
 
-        self.conv10_1 = nn.Conv2d(32, 1, kernel_size=1, stride=1)
+        self.conv10_1 = nn.Conv2d(32, 3, kernel_size=1, stride=1)
 
     def lrelu(self, x):
         outt = torch.max(0.2 * x, x)
@@ -162,7 +162,7 @@ class DocNLC(nn.Module):
     
 
 if __name__ == '__main__':
-    inp = torch.randn(1, 1, 256, 256).cuda()
+    inp = torch.randn(1, 3, 256, 256).cuda()
     model = DocNLC().cuda()
     res = model(inp)
     print(res.shape)
