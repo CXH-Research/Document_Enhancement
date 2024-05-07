@@ -214,18 +214,16 @@ class DocEnTR(nn.Module):
         )
 
     def forward(self, img):
-
-        img = torch.cat((img, img, img), dim=1)
         
         res = self.model(img)
 
         res = rearrange(res, 'b (h w) (p1 p2 c) -> b c (h p1) (w p2)',
                         p1=self.patch_size, p2=self.patch_size,  h=self.image_size//self.patch_size)
         
-        return torch.mean(res, dim=1, keepdim=True)
+        return res
 
 if __name__ == '__main__':
-    inp = torch.randn(1, 1, 256, 256).cuda()
+    inp = torch.randn(1, 3, 256, 256).cuda()
     
     model = DocEnTR().cuda()
 
