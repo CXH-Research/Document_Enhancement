@@ -59,7 +59,7 @@ class GAN_HTR(nn.Module):
 
         self.up6 = nn.ConvTranspose2d(512, 512, 2, stride=2)
         self.conv6 = nn.Sequential(
-            nn.Conv2d(768, 512, 3, padding=1), 
+            nn.Conv2d(768, 512, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(512, momentum=0.8),
             nn.Conv2d(512, 512, 3, padding=1),
@@ -138,7 +138,8 @@ class GAN_HTR(nn.Module):
         out = self.sigmoid(conv10)
 
         return out
-    
+
+
 if __name__ == '__main__':
     inp = torch.randn(1, 3, 256, 256).cuda()
     model = GAN_HTR().cuda()

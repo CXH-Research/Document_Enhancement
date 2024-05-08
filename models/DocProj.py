@@ -2,10 +2,11 @@ import torch.nn.functional as F
 from torch import nn
 import torch
 
+
 class DocProj(nn.Module):
     def __init__(self):
         super(DocProj, self).__init__()
-        
+
         self.block1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
@@ -16,7 +17,7 @@ class DocProj(nn.Module):
         self.block4 = ResidualBlock(64)
         self.block5 = ResidualBlock(64)
         self.block6 = ResidualBlock(64)
-        
+
         self.block9 = nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
@@ -26,7 +27,6 @@ class DocProj(nn.Module):
             nn.ReLU(),
             nn.Conv2d(64, 3, kernel_size=3, padding=1)
         )
-        
 
     def forward(self, x):
         block1 = self.block1(x)
@@ -56,7 +56,8 @@ class ResidualBlock(nn.Module):
         residual = self.bn2(residual)
 
         return x + residual
-    
+
+
 class UpsampleBLock(nn.Module):
     def __init__(self, in_channels, up_scale):
         super(UpsampleBLock, self).__init__()
@@ -69,11 +70,10 @@ class UpsampleBLock(nn.Module):
         x = self.pixel_shuffle(x)
         x = self.prelu(x)
         return x
-    
+
 
 if __name__ == '__main__':
     inp = torch.randn(1, 3, 256, 256).cuda()
     model = DocProj().cuda()
     res = model(inp)
     print(res.shape)
-

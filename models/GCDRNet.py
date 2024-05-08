@@ -18,7 +18,7 @@ class DWConv(nn.Module):
         x = x.flatten(2).transpose(1, 2)
 
         return x
-    
+
 
 class shiftmlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0., shift_size=5):
@@ -35,7 +35,6 @@ class shiftmlp(nn.Module):
         self.shift_size = shift_size
         self.pad = shift_size // 2
 
-        
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -52,46 +51,44 @@ class shiftmlp(nn.Module):
             m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
             if m.bias is not None:
                 m.bias.data.zero_()
-    
-#     def shift(x, dim):
-#         x = F.pad(x, "constant", 0)
-#         x = torch.chunk(x, shift_size, 1)
-#         x = [ torch.roll(x_c, shift, dim) for x_s, shift in zip(x, range(-pad, pad+1))]
-#         x = torch.cat(x, 1)
-#         return x[:, :, pad:-pad, pad:-pad]
+
+    #     def shift(x, dim):
+    #         x = F.pad(x, "constant", 0)
+    #         x = torch.chunk(x, shift_size, 1)
+    #         x = [ torch.roll(x_c, shift, dim) for x_s, shift in zip(x, range(-pad, pad+1))]
+    #         x = torch.cat(x, 1)
+    #         return x[:, :, pad:-pad, pad:-pad]
 
     def forward(self, x, H, W):
         # pdb.set_trace()
         B, N, C = x.shape
 
         xn = x.transpose(1, 2).view(B, C, H, W).contiguous()
-        xn = F.pad(xn, (self.pad, self.pad, self.pad, self.pad) , "constant", 0)
+        xn = F.pad(xn, (self.pad, self.pad, self.pad, self.pad), "constant", 0)
         xs = torch.chunk(xn, self.shift_size, 1)
-        x_shift = [torch.roll(x_c, shift, 2) for x_c, shift in zip(xs, range(-self.pad, self.pad+1))]
+        x_shift = [torch.roll(x_c, shift, 2) for x_c, shift in zip(xs, range(-self.pad, self.pad + 1))]
         x_cat = torch.cat(x_shift, 1)
         x_cat = torch.narrow(x_cat, 2, self.pad, H)
         x_s = torch.narrow(x_cat, 3, self.pad, W)
 
-
-        x_s = x_s.reshape(B,C,H*W).contiguous()
-        x_shift_r = x_s.transpose(1,2)
-
+        x_s = x_s.reshape(B, C, H * W).contiguous()
+        x_shift_r = x_s.transpose(1, 2)
 
         x = self.fc1(x_shift_r)
 
         x = self.dwconv(x, H, W)
-        x = self.act(x) 
+        x = self.act(x)
         x = self.drop(x)
 
         xn = x.transpose(1, 2).view(B, C, H, W).contiguous()
-        xn = F.pad(xn, (self.pad, self.pad, self.pad, self.pad) , "constant", 0)
+        xn = F.pad(xn, (self.pad, self.pad, self.pad, self.pad), "constant", 0)
         xs = torch.chunk(xn, self.shift_size, 1)
-        x_shift = [torch.roll(x_c, shift, 3) for x_c, shift in zip(xs, range(-self.pad, self.pad+1))]
+        x_shift = [torch.roll(x_c, shift, 3) for x_c, shift in zip(xs, range(-self.pad, self.pad + 1))]
         x_cat = torch.cat(x_shift, 1)
         x_cat = torch.narrow(x_cat, 2, self.pad, H)
         x_s = torch.narrow(x_cat, 3, self.pad, W)
-        x_s = x_s.reshape(B,C,H*W).contiguous()
-        x_shift_c = x_s.transpose(1,2)
+        x_s = x_s.reshape(B, C, H * W).contiguous()
+        x_shift_c = x_s.transpose(1, 2)
 
         x = self.fc2(x_shift_c)
         x = self.drop(x)
@@ -102,7 +99,6 @@ class shiftedBlock(nn.Module):
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1):
         super().__init__()
-
 
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -172,13 +168,14 @@ class OverlapPatchEmbed(nn.Module):
         x = self.norm(x)
 
         return x, H, W
-    
+
 
 class UNext_full_resolution_padding(nn.Module):
 
     ## Conv 3 + MLP 2 + shifted MLP
-    
-    def __init__(self,  num_classes, input_channels=3, deep_supervision=False,img_size=224, patch_size=16, in_chans=3,  embed_dims=[ 128, 160, 256],
+
+    def __init__(self, num_classes, input_channels=3, deep_supervision=False, img_size=224, patch_size=16, in_chans=3,
+                 embed_dims=[128, 160, 256],
                  num_heads=[1, 2, 4, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
                  attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
                  depths=[1, 1, 1], sr_ratios=[8, 4, 2, 1], **kwargs):
@@ -186,10 +183,10 @@ class UNext_full_resolution_padding(nn.Module):
 
         self.encoder1 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(input_channels, 16, 3, stride=1, padding=0))   
+            nn.Conv2d(input_channels, 16, 3, stride=1, padding=0))
         self.encoder2 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(16, 32, 3, stride=1, padding=0))   
+            nn.Conv2d(16, 32, 3, stride=1, padding=0))
         self.encoder3 = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(32, 128, 3, stride=1, padding=0))
@@ -197,7 +194,7 @@ class UNext_full_resolution_padding(nn.Module):
         self.ebn1 = nn.BatchNorm2d(16)
         self.ebn2 = nn.BatchNorm2d(32)
         self.ebn3 = nn.BatchNorm2d(128)
-        
+
         self.norm3 = norm_layer(embed_dims[1])
         self.norm4 = norm_layer(embed_dims[2])
 
@@ -234,18 +231,18 @@ class UNext_full_resolution_padding(nn.Module):
         self.decoder1 = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(256, 160, 3, stride=1, padding=0))
-        
-        self.decoder2 =   nn.Sequential(
-            nn.ReflectionPad2d(1),
-            nn.Conv2d(160, 128, 3, stride=1, padding=0))  
 
-        self.decoder3 =   nn.Sequential(
+        self.decoder2 = nn.Sequential(
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(160, 128, 3, stride=1, padding=0))
+
+        self.decoder3 = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(128, 32, 3, stride=1, padding=0))
-        self.decoder4 =   nn.Sequential(
+        self.decoder4 = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(32, 16, 3, stride=1, padding=0))
-        self.decoder5 =   nn.Sequential(
+        self.decoder5 = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(16, 16, 3, stride=1, padding=0))
 
@@ -253,32 +250,33 @@ class UNext_full_resolution_padding(nn.Module):
         self.dbn2 = nn.BatchNorm2d(128)
         self.dbn3 = nn.BatchNorm2d(32)
         self.dbn4 = nn.BatchNorm2d(16)
-        
+
         self.final = nn.Conv2d(16, num_classes, kernel_size=1)
 
-        self.soft = nn.Softmax(dim =1)
+        self.soft = nn.Softmax(dim=1)
 
         self.sigmoid = nn.Sigmoid()
+
     def forward(self, x):
-        
+
         B = x.shape[0]
         ### Encoder
         ### Conv Stage
         ### Stage 1
         temp = self.ebn1(self.encoder1(x))
-        out = F.relu(F.max_pool2d(temp,2,2))
+        out = F.relu(F.max_pool2d(temp, 2, 2))
         t1 = out
         ### Stage 2
-        out = F.relu(F.max_pool2d(self.ebn2(self.encoder2(out)),2,2))
+        out = F.relu(F.max_pool2d(self.ebn2(self.encoder2(out)), 2, 2))
         t2 = out
         ### Stage 3
-        out = F.relu(F.max_pool2d(self.ebn3(self.encoder3(out)),2,2))
+        out = F.relu(F.max_pool2d(self.ebn3(self.encoder3(out)), 2, 2))
         t3 = out
 
         ### Tokenized MLP Stage
         ### Stage 4
 
-        out,H,W = self.patch_embed3(out)
+        out, H, W = self.patch_embed3(out)
         for i, blk in enumerate(self.block1):
             out = blk(out, H, W)
         out = self.norm3(out)
@@ -287,7 +285,7 @@ class UNext_full_resolution_padding(nn.Module):
 
         ### Bottleneck
 
-        out ,H,W= self.patch_embed4(out)
+        out, H, W = self.patch_embed4(out)
         for i, blk in enumerate(self.block2):
             out = blk(out, H, W)
         out = self.norm4(out)
@@ -295,56 +293,57 @@ class UNext_full_resolution_padding(nn.Module):
 
         ### Stage 4
 
-        out = F.relu(F.interpolate(self.dbn1(self.decoder1(out)),scale_factor=(2,2),mode ='bilinear'))
-        
-        out = torch.add(out,t4)
-        _,_,H,W = out.shape
-        out = out.flatten(2).transpose(1,2)
+        out = F.relu(F.interpolate(self.dbn1(self.decoder1(out)), scale_factor=(2, 2), mode='bilinear'))
+
+        out = torch.add(out, t4)
+        _, _, H, W = out.shape
+        out = out.flatten(2).transpose(1, 2)
         for i, blk in enumerate(self.dblock1):
             out = blk(out, H, W)
 
         ### Stage 3
-        
+
         out = self.dnorm3(out)
         out = out.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-        out = F.relu(F.interpolate(self.dbn2(self.decoder2(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,t3)
-        _,_,H,W = out.shape
-        out = out.flatten(2).transpose(1,2)
-        
+        out = F.relu(F.interpolate(self.dbn2(self.decoder2(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, t3)
+        _, _, H, W = out.shape
+        out = out.flatten(2).transpose(1, 2)
+
         for i, blk in enumerate(self.dblock2):
             out = blk(out, H, W)
 
         out = self.dnorm4(out)
         out = out.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
 
-        out = F.relu(F.interpolate(self.dbn3(self.decoder3(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,t2)
-        out = F.relu(F.interpolate(self.dbn4(self.decoder4(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,t1)
-        out = F.relu(F.interpolate(self.decoder5(out),scale_factor=(2,2),mode ='bilinear'))
- 
-        out = torch.add(out,F.relu(temp))
+        out = F.relu(F.interpolate(self.dbn3(self.decoder3(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, t2)
+        out = F.relu(F.interpolate(self.dbn4(self.decoder4(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, t1)
+        out = F.relu(F.interpolate(self.decoder5(out), scale_factor=(2, 2), mode='bilinear'))
+
+        out = torch.add(out, F.relu(temp))
         out = self.final(out)
         return self.sigmoid(out)
-    
+
 
 class UNext_full_resolution_padding_L_py_L(nn.Module):
 
     ## Conv 3 + MLP 2 + shifted MLP
-    
-    def __init__(self,  num_classes, input_channels=3, deep_supervision=False,img_size=224, patch_size=16, in_chans=3,  embed_dims=[128, 256, 512],
+
+    def __init__(self, num_classes, input_channels=3, deep_supervision=False, img_size=224, patch_size=16, in_chans=3,
+                 embed_dims=[128, 256, 512],
                  num_heads=[1, 2, 4, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
                  attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
                  depths=[1, 1, 1], sr_ratios=[8, 4, 2, 1], **kwargs):
         super().__init__()
-        
+
         self.encoder1 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(input_channels, 32, 3, stride=1, padding=0))   
+            nn.Conv2d(input_channels, 32, 3, stride=1, padding=0))
         self.encoder2 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(32, 64, 3, stride=1, padding=0))   
+            nn.Conv2d(32, 64, 3, stride=1, padding=0))
         self.encoder3 = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(64, 128, 3, stride=1, padding=0))
@@ -352,7 +351,7 @@ class UNext_full_resolution_padding_L_py_L(nn.Module):
         self.ebn1 = nn.BatchNorm2d(32)
         self.ebn2 = nn.BatchNorm2d(64)
         self.ebn3 = nn.BatchNorm2d(128)
-        
+
         self.norm3 = norm_layer(embed_dims[1])
         self.norm4 = norm_layer(embed_dims[2])
 
@@ -388,68 +387,68 @@ class UNext_full_resolution_padding_L_py_L(nn.Module):
 
         self.decoder1 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(512, 256, 3, stride=1,padding=0))
-        self.decoder2 =   nn.Sequential(
+            nn.Conv2d(512, 256, 3, stride=1, padding=0))
+        self.decoder2 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(256,128,3,stride=1,padding=0))
-        self.decoder3 =   nn.Sequential(
+            nn.Conv2d(256, 128, 3, stride=1, padding=0))
+        self.decoder3 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(128,64,3,stride=1,padding=0)) 
-        self.decoder4 =   nn.Sequential(
+            nn.Conv2d(128, 64, 3, stride=1, padding=0))
+        self.decoder4 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(64,32,3,stride=1,padding=0))
-        self.decoder5 =  nn.Sequential(
+            nn.Conv2d(64, 32, 3, stride=1, padding=0))
+        self.decoder5 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(32,32,3,stride=1,padding=0))
+            nn.Conv2d(32, 32, 3, stride=1, padding=0))
 
         self.dbn1 = nn.BatchNorm2d(256)
         self.dbn2 = nn.BatchNorm2d(128)
         self.dbn3 = nn.BatchNorm2d(64)
         self.dbn4 = nn.BatchNorm2d(32)
         self.dbn5 = nn.BatchNorm2d(32)
-        
-        self.final = nn.Conv2d(32,num_classes,kernel_size=1)
 
-        self.out8 = nn.Sequential(nn.Conv2d(128,128,3,1,1),
-                                    nn.BatchNorm2d(128),
-                                    nn.ReLU(inplace=True),
-                                    nn.Conv2d(128,3,kernel_size=1))
-        self.out4 = nn.Sequential(nn.Conv2d(64,64,3,1,1),
-                                    nn.BatchNorm2d(64),
-                                    nn.ReLU(inplace=True),
-                                    nn.Conv2d(64,3,kernel_size=1))
-        self.out2 = nn.Sequential(nn.Conv2d(32,32,3,1,1),
-                                    nn.BatchNorm2d(32),
-                                    nn.ReLU(inplace=True),
-                                    nn.Conv2d(32,3,kernel_size=1))
+        self.final = nn.Conv2d(32, num_classes, kernel_size=1)
+
+        self.out8 = nn.Sequential(nn.Conv2d(128, 128, 3, 1, 1),
+                                  nn.BatchNorm2d(128),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(128, 3, kernel_size=1))
+        self.out4 = nn.Sequential(nn.Conv2d(64, 64, 3, 1, 1),
+                                  nn.BatchNorm2d(64),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(64, 3, kernel_size=1))
+        self.out2 = nn.Sequential(nn.Conv2d(32, 32, 3, 1, 1),
+                                  nn.BatchNorm2d(32),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(32, 3, kernel_size=1))
 
         # self.out8 = nn.Conv2d(128,3,kernel_size=1)
         # self.out4 = nn.Conv2d(64,3,kernel_size=1)
         # self.out2 = nn.Conv2d(32,3,kernel_size=1)
 
-        self.soft = nn.Softmax(dim =1)
+        self.soft = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        
+
         B = x.shape[0]
         ### Encoder
         ### Conv Stage
         ### Stage 1
         temp = self.ebn1(self.encoder1(x))
-        out = F.relu(F.max_pool2d(temp,2,2))
+        out = F.relu(F.max_pool2d(temp, 2, 2))
         t1 = out
         ### Stage 2
-        out = F.relu(F.max_pool2d(self.ebn2(self.encoder2(out)),2,2))
+        out = F.relu(F.max_pool2d(self.ebn2(self.encoder2(out)), 2, 2))
         t2 = out
         ### Stage 3
-        out = F.relu(F.max_pool2d(self.ebn3(self.encoder3(out)),2,2))
+        out = F.relu(F.max_pool2d(self.ebn3(self.encoder3(out)), 2, 2))
         t3 = out
 
         ### Tokenized MLP Stage
         ### Stage 4
 
-        out,H,W = self.patch_embed3(out)
+        out, H, W = self.patch_embed3(out)
         for i, blk in enumerate(self.block1):
             out = blk(out, H, W)
         out = self.norm3(out)
@@ -458,7 +457,7 @@ class UNext_full_resolution_padding_L_py_L(nn.Module):
 
         ### Bottleneck
 
-        out ,H,W= self.patch_embed4(out)
+        out, H, W = self.patch_embed4(out)
         for i, blk in enumerate(self.block2):
             out = blk(out, H, W)
         out = self.norm4(out)
@@ -466,23 +465,23 @@ class UNext_full_resolution_padding_L_py_L(nn.Module):
 
         ### Stage 4
 
-        out = F.relu(F.interpolate(self.dbn1(self.decoder1(out)),scale_factor=(2,2),mode ='bilinear'))
-        
-        out = torch.add(out,t4)
-        _,_,H,W = out.shape
-        out = out.flatten(2).transpose(1,2)
+        out = F.relu(F.interpolate(self.dbn1(self.decoder1(out)), scale_factor=(2, 2), mode='bilinear'))
+
+        out = torch.add(out, t4)
+        _, _, H, W = out.shape
+        out = out.flatten(2).transpose(1, 2)
         for i, blk in enumerate(self.dblock1):
             out = blk(out, H, W)
 
         ### Stage 3
-        
+
         out = self.dnorm3(out)
         out = out.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-        out = F.relu(F.interpolate(self.dbn2(self.decoder2(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,t3)
-        _,_,H,W = out.shape
-        out = out.flatten(2).transpose(1,2)
-        
+        out = F.relu(F.interpolate(self.dbn2(self.decoder2(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, t3)
+        _, _, H, W = out.shape
+        out = out.flatten(2).transpose(1, 2)
+
         for i, blk in enumerate(self.dblock2):
             out = blk(out, H, W)
 
@@ -491,34 +490,33 @@ class UNext_full_resolution_padding_L_py_L(nn.Module):
 
         out8 = self.sigmoid(self.out8(out))
 
-        out = F.relu(F.interpolate(self.dbn3(self.decoder3(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,t2)
+        out = F.relu(F.interpolate(self.dbn3(self.decoder3(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, t2)
 
         out4 = self.sigmoid(self.out4(out))
 
-        out = F.relu(F.interpolate(self.dbn4(self.decoder4(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,t1)
+        out = F.relu(F.interpolate(self.dbn4(self.decoder4(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, t1)
 
         out2 = self.sigmoid(self.out2(out))
 
-        out = F.relu(F.interpolate(self.dbn5(self.decoder5(out)),scale_factor=(2,2),mode ='bilinear'))
-        out = torch.add(out,F.relu(temp))
+        out = F.relu(F.interpolate(self.dbn5(self.decoder5(out)), scale_factor=(2, 2), mode='bilinear'))
+        out = torch.add(out, F.relu(temp))
 
         return self.sigmoid(self.final(out))
-    
+
 
 class GCDRNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model1 = UNext_full_resolution_padding(num_classes=3, input_channels=3,img_size=512)
-        self.model2 = UNext_full_resolution_padding_L_py_L(num_classes=3, input_channels=6,img_size=512)
+        self.model1 = UNext_full_resolution_padding(num_classes=3, input_channels=3, img_size=512)
+        self.model2 = UNext_full_resolution_padding_L_py_L(num_classes=3, input_channels=6, img_size=512)
 
     def forward(self, inp):
         shadow = self.model1(inp)
         model1_im = torch.clamp(inp / shadow, 0, 1)
         res = self.model2(torch.cat((inp, model1_im), 1))
         return res
-
 
 
 if __name__ == '__main__':

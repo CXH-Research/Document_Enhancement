@@ -1,30 +1,12 @@
 import torch
 from torch import nn
-import math
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 
-# helpers
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
-
-
-# classes
-def exists(val):
-    return val is not None
-
-
-def conv_output_size(image_size, kernel_size, stride, padding):
-    return int(((image_size - kernel_size + (2 * padding)) / stride) + 1)
-
-
-# classes
-
-class RearrangeImage(nn.Module):
-    def forward(self, x):
-        return rearrange(x, 'b (h w) c -> b c h w', h=int(math.sqrt(x.shape[1])))
 
 
 class PreNorm(nn.Module):
@@ -62,8 +44,6 @@ class Attention(nn.Module):
         self.scale = dim_head ** -0.5
 
         self.attend = nn.Softmax(dim=-1)
-        self.dropout = nn.Dropout(dropout)
-
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.to_out = nn.Sequential(
@@ -78,7 +58,6 @@ class Attention(nn.Module):
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
         attn = self.attend(dots)
-        attn = self.dropout(attn)
 
         out = torch.matmul(attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
@@ -103,33 +82,11 @@ class Transformer(nn.Module):
 
 
 class ViT(nn.Module):
-    def __init__(self, *, image_size=256, patch_size=16, word_size=8, num_classes=1000, dim, depth, heads, mlp_dim=2048,
-                 pool='cls', channels=1, dim_head=64, dropout=0., emb_dropout=0., transformer=None,
-                 t2t_layers=((7, 4), (3, 2), (3, 2))):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool='cls', channels=3,
+                 dim_head=64, dropout=0., emb_dropout=0.):
         super().__init__()
-        layers = []
-        layer_dim = channels
-        output_image_size = image_size
-
-        for i, (kernel_size, stride) in enumerate(t2t_layers):
-            layer_dim *= kernel_size ** 2
-            is_first = i == 0
-            is_last = i == (len(t2t_layers) - 1)
-            output_image_size = conv_output_size(output_image_size, kernel_size, stride, stride // 2)
-
-            layers.extend([
-                RearrangeImage() if not is_first else nn.Identity(),
-                nn.Unfold(kernel_size=kernel_size, stride=stride, padding=stride // 2),
-                Rearrange('b c n -> b n c'),
-                Transformer(dim=layer_dim, heads=1, depth=1, dim_head=layer_dim, mlp_dim=layer_dim,
-                            dropout=dropout) if not is_last else nn.Identity(),
-            ])
-        layers.append(nn.Linear(layer_dim, dim))
-        self.to_patch_embedding = nn.Sequential(*layers)
-
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
-        word_height, word_width = pair(word_size)
 
         assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
 
@@ -137,19 +94,12 @@ class ViT(nn.Module):
         patch_dim = channels * patch_height * patch_width
         assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
 
-        # self.to_patch_embedding = nn.Sequential(
-        #    Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_height, p2 = patch_width), 
-        #    nn.Linear(patch_dim, dim),
-        # )
-        self.to_patch_embedding_ = nn.Sequential(
+        self.to_patch_embedding = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
             nn.Linear(patch_dim, dim),
         )
-        self.to_patch_embedding = nn.Sequential(*layers)
 
-        self.pos_embedding = nn.Parameter(torch.randn(1, output_image_size ** 2, dim))
-
-        # self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
@@ -167,44 +117,68 @@ class ViT(nn.Module):
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
 
-        cls_tokens = repeat(self.cls_token, '1 n d -> b n d', b=b)
+        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
         x += self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
 
         x = self.transformer(x)
 
-        x = x.mean(dim=1) if self.pool == 'cls' else x[:, 0]
+        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
 
         x = self.to_latent(x)
-        return 1
+        return self.mlp_head(x)
 
 
-class BINMODEL(nn.Module):
+class DIAE(nn.Module):
     def __init__(
             self,
             *,
-            encoder,
-            inner_encoder,
+            image_size,
+            patch_size,
+            dim,
             decoder_dim,
             masking_ratio=0.75,
             decoder_depth=1,
             decoder_heads=8,
-            decoder_dim_head=64
+            decoder_dim_head=64,
+
     ):
         super().__init__()
         assert masking_ratio > 0 and masking_ratio < 1, 'masking ratio must be kept between 0 and 1'
         self.masking_ratio = masking_ratio
 
+        self.image_size = image_size
+        self.patch_size = patch_size
+        # taken from ViT
+
+        channels = 3
+        patch_height, patch_width = pair(patch_size)
+        image_height, image_width = pair(image_size)
+
+        num_patches = (image_height // patch_height) * (image_width // patch_width)
+        patch_dim = channels * patch_height * patch_width
+
+        # Projection heads
+
+        self.deg_patch_to_emb = nn.Linear(patch_dim, dim)
+        self.blur_patch_to_emb = nn.Linear(patch_dim, dim)
+
         # extract some hyperparameters and functions from encoder (vision transformer to be trained)
 
-        self.encoder = encoder
-        self.InnerEncoder = inner_encoder
-        num_patches, encoder_dim = encoder.pos_embedding.shape[-2:]  # [1,257,768], 257,768
-        self.patch_to_emb = encoder.to_patch_embedding
-        # self.to_patch - Rearange.. , self.patch_to_emb - Linear Layer
-        # pixel_values_per_patch = self.patch_to_emb.weight.shape[-1]
-        pixel_values_per_patch = 256
+        self.encoder = ViT(
+            image_size=image_size,
+            patch_size=patch_size,
+            num_classes=1000,
+            dim=768,  # 1024
+            depth=6,  # 6
+            heads=8,  # 8
+            mlp_dim=2048
+        )
+        num_patches, encoder_dim = self.encoder.pos_embedding.shape[-2:]
+        self.to_patch, self.patch_to_emb = self.encoder.to_patch_embedding[:2]
+
+        pixel_values_per_patch = self.patch_to_emb.weight.shape[-1]
 
         # decoder parameters
 
@@ -213,61 +187,83 @@ class BINMODEL(nn.Module):
         self.decoder = Transformer(dim=decoder_dim, depth=decoder_depth, heads=decoder_heads, dim_head=decoder_dim_head,
                                    mlp_dim=decoder_dim * 4)
         self.decoder_pos_emb = nn.Embedding(num_patches, decoder_dim)
-        self.to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
+
+        self.clean_to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
+        # self.deg_to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
+        # self.blur_to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
 
     def forward(self, img):
-        tokens = self.patch_to_emb(img)  # Pass through Linear layer
-        b, n, _ = tokens.shape
-        tokens = tokens + self.encoder.pos_embedding[:, :(n)]
+        device = img.device
 
-        encoded_tokens = self.encoder.transformer(tokens)  # Without CLS Token
-        # print("Encoded Tokens :",encoded_tokens.shape) # Main Patch
+        # get patches
+
+        patches = self.to_patch(img)
+        batch, num_patches, *_ = patches.shape
+
+        # patch to encoder tokens and add positions
+
+        tokens = self.patch_to_emb(patches)
+        tokens = tokens + self.encoder.pos_embedding[:, 1:(num_patches + 1)]
+
+        # calculate of patches needed to be masked, and get random indices, dividing it up for mask vs unmasked
+
+        num_masked = int(self.masking_ratio * num_patches)
+        rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
+        masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
+
+        # get the unmasked tokens to be encoded
+
+        batch_range = torch.arange(batch, device=device)[:, None]
+        tokens = tokens[batch_range, unmasked_indices]
+
+        # get the patches to be masked for the final reconstruction loss
+
+        # masked_patches = patches[batch_range, masked_indices]
+
+        # attend with vision transformer
+
+        encoded_tokens = self.encoder.transformer(tokens)
+
+        # project encoder to decoder dimensions, if they are not equal - the paper says you can get away with a smaller dimension for decoder
 
         decoder_tokens = self.enc_to_dec(encoded_tokens)
-        # print(decoder_tokens.shape)
 
-        # attend with decoder
+        # reapply decoder position embedding to unmasked tokens
 
+        decoder_tokens = decoder_tokens + self.decoder_pos_emb(unmasked_indices)
+
+        # repeat mask tokens for number of masked, and add the positions using the masked indices derived above
+
+        mask_tokens = repeat(self.mask_token, 'd -> b n d', b=batch, n=num_masked)
+        mask_tokens = mask_tokens + self.decoder_pos_emb(masked_indices)
+
+        # concat the masked tokens to the decoder tokens and attend with decoder
+
+        decoder_tokens = torch.cat((mask_tokens, decoder_tokens), dim=1)
         decoded_tokens = self.decoder(decoder_tokens)
 
-        # project to pixel values
-        # print("Decoded Tokens Shape",decoded_tokens.shape)
-        pred_pixel_values = self.to_pixels(decoded_tokens)
+        # splice out the mask tokens and project to pixel values
 
-        return pred_pixel_values.unsqueeze(1)
+        mask_tokens = decoded_tokens[:, :num_masked]
+        pred_pixel_values = self.clean_to_pixels(mask_tokens)
 
+        patches[batch_range, masked_indices] = pred_pixel_values
 
-class BinFormer(nn.Module):
-    def __init__(
-            self,
-            *,
-            image_size=256
-    ):
-        super().__init__()
-        v = ViT(image_size=image_size, dim=768, depth=6, heads=8)
-        IN = ViT(
-            image_size=image_size,
-            dim=768,
-            depth=4,
-            heads=6,
-            mlp_dim=2048
-        )
-        self.model = BINMODEL(
-            encoder=v,
-            inner_encoder=IN,
-            masking_ratio=0.5,  # __ doesnt matter for binarization
-            decoder_dim=768,
-            decoder_depth=6,
-            decoder_heads=8  # anywhere from 1 to 8
-        )
+        rec_images = rearrange(patches, 'b (h w) (p1 p2 c) -> b c (h p1) (w p2)', p1=self.patch_size,
+                               p2=self.patch_size, h=self.image_size[0] // self.patch_size)
 
-    def forward(self, img):
-        return self.model(img)
+        return rec_images
 
 
 if __name__ == '__main__':
-    image_size = 256
     inp = torch.randn(1, 3, 256, 256).cuda()
-    model = BinFormer().cuda()
+    model = DIAE(
+        masking_ratio=0.6,  # the paper recommended 75% masked patches
+        decoder_dim=512,  # paper showed good results with just 512
+        decoder_depth=6,
+        image_size=(256, 256),
+        patch_size=8,
+        dim=768,
+    ).cuda()
     res = model(inp)
     print(res.shape)

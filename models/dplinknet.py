@@ -419,7 +419,7 @@ class LinkNet34(nn.Module):
         out = self.finalconv3(out)
 
         return torch.sigmoid(out)
-    
+
 
 if __name__ == '__main__':
     model = DPLinkNet34()

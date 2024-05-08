@@ -20,7 +20,7 @@ class SauvolaMultiWindow(Module):
     """
 
     def __init__(self,
-                 window_size_list=[3,5,7,11,15,19],
+                 window_size_list=[3, 5, 7, 11, 15, 19],
                  init_k=0.2,
                  init_R=0.5,
                  train_k=True,
@@ -34,25 +34,27 @@ class SauvolaMultiWindow(Module):
         self.train_R = train_R
         self.build()
 
-    def _initialize_ii_buffer(self, x) :
+    def _initialize_ii_buffer(self, x):
         """Compute integeral image
         """
-        x_pad = F.pad(x, [0, 0, self.max_wh//2+1, self.max_wh//2+1, self.max_ww//2+1, self.max_ww//2+1, 0, 0])
-        ii_x  = torch.cumsum(x_pad, dim=1)
+        x_pad = F.pad(x,
+                      [0, 0, self.max_wh // 2 + 1, self.max_wh // 2 + 1, self.max_ww // 2 + 1, self.max_ww // 2 + 1, 0,
+                       0])
+        ii_x = torch.cumsum(x_pad, dim=1)
         ii_x2 = torch.cumsum(ii_x, dim=2)
         return ii_x2
 
-    def _get_max_size( self ) :
+    def _get_max_size(self):
         """Compute the max size of all windows
         """
         mh, mw = 0, 0
-        for hw in self.window_size_list :
-            if ( isinstance( hw, int ) ) :
+        for hw in self.window_size_list:
+            if (isinstance(hw, int)):
                 h = w = hw
-            else :
+            else:
                 h, w = hw[:2]
-            mh = max( h, mh )
-            mw = max( w, mw )
+            mh = max(h, mh)
+            mw = max(w, mw)
         return mh, mw
 
     def build(self):
@@ -62,10 +64,10 @@ class SauvolaMultiWindow(Module):
         self.built = True
         self.max_wh, self.max_ww = self._get_max_size()
         self.k = nn.parameter.Parameter(torch.full(size=[1, self.num_woi, 1, 1, 1], fill_value=self.init_k,
-                            dtype=torch.float32), requires_grad=self.train_k)
+                                                   dtype=torch.float32), requires_grad=self.train_k)
 
         self.R = nn.parameter.Parameter(torch.full(size=[1, self.num_woi, 1, 1, 1], fill_value=self.init_R,
-                            dtype=torch.float32), requires_grad=self.train_R)
+                                                   dtype=torch.float32), requires_grad=self.train_R)
 
         return
 
@@ -135,13 +137,14 @@ class SauvolaMultiWindow(Module):
         batch_size, n_rows, n_cols, n_chs = input_shape
         return (batch_size, self.num_woi, n_rows, n_cols, n_chs)
 
+
 class DifferenceThresh(Module):
     def __init__(self,
                  img_min=0.,
                  img_max=1.,
                  init_alpha=16.,
                  train_alpha=False
-                 ) :
+                 ):
         super().__init__()
         self.img_min = img_min
         self.img_max = img_max
@@ -151,22 +154,24 @@ class DifferenceThresh(Module):
 
     def build(self):
         self.alpha = nn.parameter.Parameter(torch.full(size=(1, 1, 1, 1), fill_value=self.init_alpha
-                                , dtype=torch.float32), requires_grad=self.train_alpha)
+                                                       , dtype=torch.float32), requires_grad=self.train_alpha)
         return
-    def forward(self, inputs) :
+
+    def forward(self, inputs):
         img, th = inputs
 
         scaled_diff = (img - th) * self.alpha / (self.img_max - self.img_min)
         return scaled_diff
 
-    def get_config(self) :
+    def get_config(self):
         base_config = super().get_config()
         config = {"img_min": self.img_min,
                   "img_max": self.img_max,
                   "init_alpha": self.init_alpha,
                   "train_alpha": self.train_alpha
-                 }
+                  }
         return dict(list(base_config.items()) + list(config.items()))
+
 
 class InstanceNorm(Module):
     def __init__(self):
@@ -177,7 +182,8 @@ class InstanceNorm(Module):
         t_sigma = torch.maximum(torch.std(t, dim=(1, 2), keepdim=True), torch.tensor(1e-5))
         t_norm = (t - t_mu) / t_sigma
         return t_norm
-    
+
+
 class Conv_block(Module):
     def __init__(self,
                  in_channels,
@@ -212,15 +218,15 @@ class Conv_block(Module):
         act = self.activation(norm)
         return act
 
+
 class SauvolaNet(Module):
     def __init__(self, window_size_list=[3, 5, 7, 11, 15, 19],
-                 train_k=True, # test
+                 train_k=True,  # test
                  train_R=True,
                  train_alpha=True,
                  norm_type='inorm',
                  base_filters=4,
                  img_range=(0., 1.)):
-
         super(SauvolaNet, self).__init__()
 
         # attention branch
@@ -232,15 +238,15 @@ class SauvolaNet(Module):
         # later blocks
         convs = []
 
-        self.convs1 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2),  norm_type=norm_type)
+        self.convs1 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2), norm_type=norm_type)
         filters += base_filters
-        self.convs2 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2),  norm_type=norm_type)
+        self.convs2 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2), norm_type=norm_type)
         filters += base_filters
-        self.convs3 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2),  norm_type=norm_type)
+        self.convs3 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2), norm_type=norm_type)
         filters += base_filters
-        self.convs4 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2),  norm_type=norm_type)
+        self.convs4 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2), norm_type=norm_type)
         filters += base_filters
-        self.convs5 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2),  norm_type=norm_type)
+        self.convs5 = Conv_block(filters, filters + base_filters, dilation_rate=(2, 2), norm_type=norm_type)
         filters += base_filters
 
         self.conv2 = nn.Conv2d(filters, n, (3, 3), padding='same')
@@ -249,12 +255,12 @@ class SauvolaNet(Module):
         self.softmax = nn.Softmax(dim=1)
 
         self.th = SauvolaMultiWindow(window_size_list=window_size_list,
-                            train_k=train_k,
-                            train_R=train_R)
+                                     train_k=train_k,
+                                     train_R=train_R)
         self.diff = DifferenceThresh(img_min=img_range[0],
-                            img_max=img_range[1],
-                            init_alpha=16.,
-                            train_alpha=train_alpha)
+                                     img_max=img_range[1],
+                                     init_alpha=16.,
+                                     train_alpha=train_alpha)
 
     def forward(self, inputs):
         x2 = self.conv1(inputs)
@@ -272,6 +278,7 @@ class SauvolaNet(Module):
         diff = self.diff([x1, th1])
         diff = torch.permute(diff, (0, 3, 1, 2))
         return diff
+
 
 if __name__ == '__main__':
     model = SauvolaNet()

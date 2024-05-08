@@ -16,7 +16,7 @@ class SAE(nn.Module):
         self.decoder_layers = nn.ModuleList()
 
         self.input_img = nn.Conv2d(
-            1, nb_filters, kernel_size=k_size, stride=strides, padding=k_size//2)
+            1, nb_filters, kernel_size=k_size, stride=strides, padding=k_size // 2)
         self.bn = nn.BatchNorm2d(nb_filters)
         self.relu = nn.ReLU()
         if dropout > 0:
@@ -24,7 +24,7 @@ class SAE(nn.Module):
 
         for i in range(nb_layers):
             self.encoder_layers.append(nn.Conv2d(
-                nb_filters, nb_filters, kernel_size=k_size, stride=strides, padding=k_size//2))
+                nb_filters, nb_filters, kernel_size=k_size, stride=strides, padding=k_size // 2))
             self.encoder_layers.append(nn.BatchNorm2d(nb_filters))
             self.encoder_layers.append(nn.ReLU())
             if dropout > 0:
@@ -32,14 +32,14 @@ class SAE(nn.Module):
 
         for i in range(nb_layers):
             self.decoder_layers.append(nn.ConvTranspose2d(
-                nb_filters, nb_filters, kernel_size=k_size, stride=strides, padding=k_size//2))
+                nb_filters, nb_filters, kernel_size=k_size, stride=strides, padding=k_size // 2))
             self.decoder_layers.append(nn.BatchNorm2d(nb_filters))
             self.decoder_layers.append(nn.ReLU())
             if dropout > 0:
                 self.decoder_layers.append(nn.Dropout(dropout))
 
         self.decoder = nn.Conv2d(
-            nb_filters, 1, kernel_size=k_size, stride=1, padding=k_size//2)
+            nb_filters, 1, kernel_size=k_size, stride=1, padding=k_size // 2)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):

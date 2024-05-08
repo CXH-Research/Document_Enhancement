@@ -47,7 +47,8 @@ class Attention(nn.Module):
         if task_embed != None:
             _N, _H, _L, _D = q.shape
             if q.shape[1] * q.shape[2] * q.shape[3] != task_embed.shape[1] * q.shape[2]:
-                task_embed = nn.functional.interpolate(task_embed.unsqueeze(0), (q.shape[2], q.shape[1] * q.shape[3])).squeeze(0)
+                task_embed = nn.functional.interpolate(task_embed.unsqueeze(0),
+                                                       (q.shape[2], q.shape[1] * q.shape[3])).squeeze(0)
                 task_embed = task_embed.reshape(1, _H, _L, _D)
             else:
                 task_embed = task_embed.reshape(1, _H, _L, _D)
@@ -156,6 +157,7 @@ class PatchEmbed(nn.Module):
     input : N C H W
     output: N num_patch P^2*C
     """
+
     def __init__(self, patch_size=1, in_channels=64):
         super().__init__()
         self.patch_size = patch_size
@@ -182,6 +184,7 @@ class DePatchEmbed(nn.Module):
     input : N num_patch P^2*C
     output: N C H W
     """
+
     def __init__(self, patch_size=1, in_channels=64):
         super().__init__()
         self.patch_size = patch_size
@@ -247,8 +250,8 @@ class IllTr_Net(nn.Module):
         self.de_patch_embedding = DePatchEmbed(patch_size=patch_size, in_channels=mid_channels)
         # tail
         self.tail = Tail(int(mid_channels), in_channels)
-        
-        self.acf = nn.Hardtanh(0,1)
+
+        self.acf = nn.Hardtanh(0, 1)
 
         trunc_normal_(self.pos_embed, std=.02)
         self.apply(self._init_weights)
@@ -267,19 +270,20 @@ class IllTr_Net(nn.Module):
         x, ori_shape = self.patch_embedding(x)
 
         if self.pos_embed.shape != x.shape:
-            x = x + nn.functional.interpolate(self.pos_embed[:, :x.shape[1]].unsqueeze(1), (x.shape[1], x.shape[2])).squeeze(1)
+            x = x + nn.functional.interpolate(self.pos_embed[:, :x.shape[1]].unsqueeze(1),
+                                              (x.shape[1], x.shape[2])).squeeze(1)
         else:
             x = x + self.pos_embed
-        
+
         for blk in self.encoder:
             x = blk(x)
 
         for blk in self.decoder:
             x = blk(x, self.task_embed[0, :, :x.shape[1]])
-      
+
         x = self.de_patch_embedding(x, ori_shape)
         x = self.tail(x)
-        
+
         x = self.acf(x)
         return x
 

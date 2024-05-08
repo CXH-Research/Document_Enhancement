@@ -4,17 +4,16 @@ import torch.nn.functional as F
 
 
 def mean_channels(F):
-    assert(F.dim() == 4)
+    assert (F.dim() == 4)
     spatial_sum = F.sum(3, keepdim=True).sum(2, keepdim=True)
     return spatial_sum / (F.size(2) * F.size(3))
 
 
 def stdv_channels(F):
-    assert(F.dim() == 4)
+    assert (F.dim() == 4)
     F_mean = mean_channels(F)
     F_variance = (F - F_mean).pow(2).sum(3, keepdim=True).sum(2, keepdim=True) / (F.size(2) * F.size(3))
     return F_variance.pow(0.5)
-
 
 
 class AttING(nn.Module):
@@ -25,18 +24,18 @@ class AttING(nn.Module):
         self.conv2_2 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=False)
         self.instance = nn.InstanceNorm2d(channels, affine=True)
         self.interative = nn.Sequential(
-            nn.Conv2d(channels*2, channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(channels * 2, channels, kernel_size=3, stride=1, padding=1, bias=False),
             nn.LeakyReLU(0.1),
             nn.Sigmoid()
         )
         self.act = nn.LeakyReLU(0.1)
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.contrast = stdv_channels
-        self.process = nn.Sequential(nn.Conv2d(channels*2, channels//2, kernel_size=3, padding=1, bias=True),
+        self.process = nn.Sequential(nn.Conv2d(channels * 2, channels // 2, kernel_size=3, padding=1, bias=True),
                                      nn.LeakyReLU(0.1),
-                                     nn.Conv2d(channels//2, channels*2, kernel_size=3, padding=1, bias=True),
+                                     nn.Conv2d(channels // 2, channels * 2, kernel_size=3, padding=1, bias=True),
                                      nn.Sigmoid())
-        self.conv1x1 = nn.Conv2d(2*channels, channels, 1, 1, 0)
+        self.conv1x1 = nn.Conv2d(2 * channels, channels, 1, 1, 0)
 
     def forward(self, x):
         x1 = self.conv1(x)
@@ -47,14 +46,14 @@ class AttING(nn.Module):
         out1 = self.conv2_1(out_instance)
         out2 = self.conv2_2(out_identity)
         out = torch.cat((out1, out2), 1)
-        xp1 = self.interative(out)*out2 + out1
-        xp2 = (1-self.interative(out))*out1 + out2
+        xp1 = self.interative(out) * out2 + out1
+        xp2 = (1 - self.interative(out)) * out1 + out2
         xp = torch.cat((xp1, xp2), 1)
-        xp = self.process(self.contrast(xp)+self.avgpool(xp))*xp
+        xp = self.process(self.contrast(xp) + self.avgpool(xp)) * xp
         xp = self.conv1x1(xp)
         xout = xp
 
-        return xout,out_instance
+        return xout, out_instance
 
 
 class DocNLC(nn.Module):
@@ -69,7 +68,7 @@ class DocNLC(nn.Module):
         # else:
         self.conv0 = nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1)
 
-        self.conv1_1 = AttING(3,32)
+        self.conv1_1 = AttING(3, 32)
         # self.conv1_1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
         self.conv1_2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         self.pool1 = nn.MaxPool2d(kernel_size=2)
@@ -110,11 +109,11 @@ class DocNLC(nn.Module):
     def lrelu(self, x):
         outt = torch.max(0.2 * x, x)
         return outt
-    
+
     def forward(self, x):
         x = self.conv0(x)
 
-        conv1ori,instance = self.conv1_1(x)
+        conv1ori, instance = self.conv1_1(x)
 
         conv1 = self.lrelu(self.conv1_2(self.lrelu(conv1ori)))
         pool1 = self.pool1(conv1)
@@ -134,32 +133,31 @@ class DocNLC(nn.Module):
         conv5 = self.lrelu(self.conv5_1(pool4))
         conv5 = self.lrelu(self.conv5_2(conv5))
 
-        up6 = F.interpolate(self.upv6(conv5),size=(conv4.shape[2],conv4.shape[3]),mode='bilinear')
+        up6 = F.interpolate(self.upv6(conv5), size=(conv4.shape[2], conv4.shape[3]), mode='bilinear')
         up6 = torch.cat([up6, conv4], 1)
         conv6 = self.lrelu(self.conv6_1(up6))
         conv6 = self.lrelu(self.conv6_2(conv6))
 
-        up7 = F.interpolate(self.upv7(conv6),size=(conv3.shape[2],conv3.shape[3]),mode='bilinear')
+        up7 = F.interpolate(self.upv7(conv6), size=(conv3.shape[2], conv3.shape[3]), mode='bilinear')
         up7 = torch.cat([up7, conv3], 1)
         conv7 = self.lrelu(self.conv7_1(up7))
         conv7 = self.lrelu(self.conv7_2(conv7))
 
-        up8 = F.interpolate(self.upv8(conv7),size=(conv2.shape[2],conv2.shape[3]),mode='bilinear')
+        up8 = F.interpolate(self.upv8(conv7), size=(conv2.shape[2], conv2.shape[3]), mode='bilinear')
         up8 = torch.cat([up8, conv2], 1)
         conv8 = self.lrelu(self.conv8_1(up8))
         conv8 = self.lrelu(self.conv8_2(conv8))
 
-        up9 = F.interpolate(self.upv9(conv8),size=(conv1.shape[2],conv1.shape[3]),mode='bilinear')
+        up9 = F.interpolate(self.upv9(conv8), size=(conv1.shape[2], conv1.shape[3]), mode='bilinear')
         up9 = torch.cat([up9, conv1], 1)
         conv9 = self.lrelu(self.conv9_1(up9))
         conv9 = self.lrelu(self.conv9_2(conv9))
 
-
         conv10 = self.conv10_1(conv9)
         out = conv10
-        
+
         return out
-    
+
 
 if __name__ == '__main__':
     inp = torch.randn(1, 3, 256, 256).cuda()
