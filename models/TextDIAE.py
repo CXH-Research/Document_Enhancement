@@ -130,7 +130,7 @@ class ViT(nn.Module):
         return self.mlp_head(x)
 
 
-class DIAE(nn.Module):
+class TextDIAE(nn.Module):
     def __init__(
             self,
             *,
@@ -257,7 +257,7 @@ class DIAE(nn.Module):
 
 if __name__ == '__main__':
     inp = torch.randn(1, 3, 256, 256).cuda()
-    model = DIAE(
+    model = TextDIAE(
         masking_ratio=0.6,  # the paper recommended 75% masked patches
         decoder_dim=512,  # paper showed good results with just 512
         decoder_depth=6,

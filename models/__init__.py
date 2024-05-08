@@ -12,3 +12,4 @@ from .GAN_HTR import GAN_HTR
 from .GCDRNet import GCDRNet
 from .illtrtemplate import illtrtemplate
 from .DocTr import DocTr
+from .TextDIAE import TextDIAE
