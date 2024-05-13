@@ -1,9 +1,8 @@
+from functools import partial
+
 import torch
 import torch.nn as nn
-from torch.functional import Tensor
-from torch.nn.modules.activation import Tanhshrink
 from timm.models.layers import trunc_normal_
-from functools import partial
 
 
 class Ffn(nn.Module):

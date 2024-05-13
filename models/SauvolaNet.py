@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import Module
 import torch.nn.functional as F
+from torch.nn import Module
 
 
 class SauvolaMultiWindow(Module):

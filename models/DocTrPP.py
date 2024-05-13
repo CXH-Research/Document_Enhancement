@@ -1,10 +1,10 @@
-import math
-import numpy as np
-import torch
-from torch import nn, Tensor
-import torch.nn.functional as F
 import copy
+import math
 from typing import Optional
+
+import torch
+import torch.nn.functional as F
+from torch import nn, Tensor
 
 
 class NestedTensor(object):
@@ -35,6 +35,7 @@ class PositionEmbeddingSine(nn.Module):
     This is a more standard version of the position embedding, very similar to the one
     used by the Attention is all you need paper, generalized to work on images.
     """
+
     def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
         super().__init__()
         self.num_pos_feats = num_pos_feats
@@ -71,6 +72,7 @@ class PositionEmbeddingLearned(nn.Module):
     """
     Absolute pos embedding, learned.
     """
+
     def __init__(self, num_pos_feats=256):
         super().__init__()
         self.row_embed = nn.Embedding(50, num_pos_feats)
@@ -217,12 +219,14 @@ class BasicEncoder(nn.Module):
 
         return x
 
+
 class attnLayer(nn.Module):
     def __init__(self, d_model, nhead=8, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-        self.multihead_attn_list = nn.ModuleList([copy.deepcopy(nn.MultiheadAttention(d_model, nhead, dropout=dropout)) for i in range(2)])
+        self.multihead_attn_list = nn.ModuleList(
+            [copy.deepcopy(nn.MultiheadAttention(d_model, nhead, dropout=dropout)) for i in range(2)])
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
@@ -250,11 +254,12 @@ class attnLayer(nn.Module):
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
-        for memory, multihead_attn, norm2, dropout2, m_pos in zip(memory_list, self.multihead_attn_list, self.norm2_list, self.dropout2_list, memory_pos):
+        for memory, multihead_attn, norm2, dropout2, m_pos in zip(memory_list, self.multihead_attn_list,
+                                                                  self.norm2_list, self.dropout2_list, memory_pos):
             tgt2 = multihead_attn(query=self.with_pos_embed(tgt, pos),
-                                       key=self.with_pos_embed(memory, m_pos),
-                                       value=memory, attn_mask=memory_mask,
-                                       key_padding_mask=memory_key_padding_mask)[0]
+                                  key=self.with_pos_embed(memory, m_pos),
+                                  value=memory, attn_mask=memory_mask,
+                                  key_padding_mask=memory_key_padding_mask)[0]
             tgt = tgt + dropout2(tgt2)
             tgt = norm2(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
@@ -263,8 +268,8 @@ class attnLayer(nn.Module):
         return tgt
 
     def forward_pre(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                     tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                     pos=None, memory_pos=None):
+                    tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                    pos=None, memory_pos=None):
         tgt2 = self.norm1(tgt)
         q = k = self.with_pos_embed(tgt2, pos)
         tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask,
@@ -282,8 +287,8 @@ class attnLayer(nn.Module):
         return tgt
 
     def forward(self, tgt, memory_list, tgt_mask=None, memory_mask=None,
-                     tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                     pos=None, memory_pos=None):
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                pos=None, memory_pos=None):
         if self.normalize_before:
             return self.forward_pre(tgt, memory_list, tgt_mask, memory_mask,
                                     tgt_key_padding_mask, memory_key_padding_mask, pos, memory_pos)
@@ -314,8 +319,9 @@ class TransDecoder(nn.Module):
         self.position_embedding = build_position_encoding(hidden_dim)
 
     def forward(self, imgf, query_embed):
-        pos = self.position_embedding(torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().cuda())  # torch.Size([1, 128, 36, 36])
-        
+        pos = self.position_embedding(
+            torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().cuda())  # torch.Size([1, 128, 36, 36])
+
         bs, c, h, w = imgf.shape
         imgf = imgf.flatten(2).permute(2, 0, 1)
         # query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
@@ -336,9 +342,10 @@ class TransEncoder(nn.Module):
         self.position_embedding = build_position_encoding(hidden_dim)
 
     def forward(self, imgf):
-        pos = self.position_embedding(torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().cuda())  # torch.Size([1, 128, 36, 36])
+        pos = self.position_embedding(
+            torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().cuda())  # torch.Size([1, 128, 36, 36])
         bs, c, h, w = imgf.shape
-        imgf = imgf.flatten(2).permute(2, 0, 1)  
+        imgf = imgf.flatten(2).permute(2, 0, 1)
         pos = pos.flatten(2).permute(2, 0, 1)
 
         for layer in self.layers:
@@ -366,7 +373,7 @@ class UpdateBlock(nn.Module):
         self.mask = nn.Sequential(
             nn.Conv2d(hidden_dim, 256, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(256, 64*9, 1, padding=0))
+            nn.Conv2d(256, 64 * 9, 1, padding=0))
 
     def forward(self, imgf, coords1):
         mask = .25 * self.mask(imgf)  # scale mask to balence gradients
@@ -384,8 +391,8 @@ def coords_grid(batch, ht, wd):
 
 def upflow8(flow, mode='bilinear'):
     new_size = (8 * flow.shape[2], 8 * flow.shape[3])
-    return  8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
-    
+    return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
+
 
 class DocTrPP(nn.Module):
     def __init__(self):
@@ -397,22 +404,22 @@ class DocTrPP(nn.Module):
 
         self.encoder_block = ['encoder_block' + str(i) for i in range(3)]
         for i in self.encoder_block:
-            self.__setattr__(i, TransEncoder(2, hidden_dim=hdim))  
+            self.__setattr__(i, TransEncoder(2, hidden_dim=hdim))
         self.down_layer = ['down_layer' + str(i) for i in range(2)]
         for i in self.down_layer:
             self.__setattr__(i, nn.Conv2d(256, 256, kernel_size=3, stride=2, padding=1))
-           
+
         self.decoder_block = ['decoder_block' + str(i) for i in range(3)]
         for i in self.decoder_block:
-            self.__setattr__(i, TransDecoder(2, hidden_dim=hdim))  
+            self.__setattr__(i, TransDecoder(2, hidden_dim=hdim))
         self.up_layer = ['up_layer' + str(i) for i in range(2)]
         for i in self.up_layer:
             self.__setattr__(i, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True))
-           
+
         self.query_embed = nn.Embedding(81, self.hidden_dim)
-        
+
         self.update_block = UpdateBlock(self.hidden_dim)
-                                    
+
     def initialize_flow(self, img):
         N, C, H, W = img.shape
         coodslar = coords_grid(N, H, W).to(img.device)
@@ -424,16 +431,15 @@ class DocTrPP(nn.Module):
     def upsample_flow(self, flow, mask):
         N, _, H, W = flow.shape
         mask = mask.view(N, 1, 9, 8, 8, H, W)
-        mask = torch.softmax(mask, dim=2) 
+        mask = torch.softmax(mask, dim=2)
 
-        up_flow = F.unfold(8 * flow, [3, 3], padding=1) 
-        up_flow = up_flow.view(N, 2, 9, 1, 1, H, W) 
+        up_flow = F.unfold(8 * flow, [3, 3], padding=1)
+        up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
 
         up_flow = torch.sum(mask * up_flow, dim=2)
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
-        
-        return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
+        return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
     def blur(self, img, kernel_size):
         pad_size = (kernel_size - 1) // 2
@@ -446,21 +452,21 @@ class DocTrPP(nn.Module):
 
         fmap = self.fnet(image1)
         fmap = torch.relu(fmap)
-        
+
         # fmap = self.TransEncoder(fmap)
         fmap1 = self.__getattr__(self.encoder_block[0])(fmap)
         fmap1d = self.__getattr__(self.down_layer[0])(fmap1)
         fmap2 = self.__getattr__(self.encoder_block[1])(fmap1d)
         fmap2d = self.__getattr__(self.down_layer[1])(fmap2)
         fmap3 = self.__getattr__(self.encoder_block[2])(fmap2d)
-        
+
         query_embed0 = self.query_embed.weight.unsqueeze(1).repeat(1, fmap3.size(0), 1)
         fmap3d_ = self.__getattr__(self.decoder_block[0])(fmap3, query_embed0)
-        fmap3du_ = self.__getattr__(self.up_layer[0])(fmap3d_).flatten(2).permute(2, 0, 1) 
+        fmap3du_ = self.__getattr__(self.up_layer[0])(fmap3d_).flatten(2).permute(2, 0, 1)
         fmap2d_ = self.__getattr__(self.decoder_block[1])(fmap2, fmap3du_)
-        fmap2du_ = self.__getattr__(self.up_layer[1])(fmap2d_).flatten(2).permute(2, 0, 1)         
-        fmap_out = self.__getattr__(self.decoder_block[2])(fmap1, fmap2du_)   
-        
+        fmap2du_ = self.__getattr__(self.up_layer[1])(fmap2d_).flatten(2).permute(2, 0, 1)
+        fmap_out = self.__getattr__(self.decoder_block[2])(fmap1, fmap2du_)
+
         # convex upsample baesd on fmap_out
         coodslar, coords0, coords1 = self.initialize_flow(image1)
         coords1 = coords1.detach()
@@ -480,8 +486,8 @@ class DocTrPP(nn.Module):
 
         out = F.grid_sample(image1, lbl, align_corners=True)
 
-        return out 
-    
+        return out
+
 
 if __name__ == '__main__':
     inp = torch.randn(1, 3, 288, 288).cuda()

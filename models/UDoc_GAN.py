@@ -1,7 +1,8 @@
 import math
+from typing import Any, Callable
+
 import torch
 import torch.nn as nn
-from typing import Any, Callable
 
 
 def weights_init(init_type="gaussian"):
