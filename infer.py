@@ -59,8 +59,7 @@ def infer():
 
         total_time += end_time - start_time
 
-        save_image(res, os.path.join(os.getcwd(), "result", test_data[2][0] + '_pred.png'))
-        save_image(tar, os.path.join(os.getcwd(), "result", test_data[2][0] + '_gt.png'))
+        save_image(res, os.path.join(os.getcwd(), "result", test_data[2][0]))
 
         stat_psnr += peak_signal_noise_ratio(res, tar, data_range=1)
         stat_ssim += structural_similarity_index_measure(res, tar, data_range=1)

@@ -15,18 +15,17 @@ from utils import *
 warnings.filterwarnings('ignore')
 
 
-
 def train():
     # Accelerate
     opt = Config('config.yml')
     seed_everything(opt.OPTIM.SEED)
-    
+
     accelerator = Accelerator(log_with='wandb') if opt.OPTIM.WANDB else Accelerator()
-    
+
     if accelerator.is_local_main_process:
         os.makedirs(opt.TRAINING.SAVE_DIR, exist_ok=True)
     device = accelerator.device
-    
+
     config = {
         "dataset": opt.TRAINING.TRAIN_DIR
     }
@@ -37,9 +36,12 @@ def train():
     val_dir = opt.TRAINING.VAL_DIR
 
     train_dataset = get_training_data(train_dir, {'w': opt.TRAINING.PS_W, 'h': opt.TRAINING.PS_H})
-    trainloader = DataLoader(dataset=train_dataset, batch_size=opt.OPTIM.BATCH_SIZE, shuffle=True, num_workers=16, drop_last=False, pin_memory=True)
-    val_dataset = get_validation_data(val_dir, {'w': opt.TRAINING.PS_W, 'h': opt.TRAINING.PS_H, 'ori': opt.TRAINING.ORI})
-    testloader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=8, drop_last=False, pin_memory=True)
+    trainloader = DataLoader(dataset=train_dataset, batch_size=opt.OPTIM.BATCH_SIZE, shuffle=True, num_workers=16,
+                             drop_last=False, pin_memory=True)
+    val_dataset = get_validation_data(val_dir,
+                                      {'w': opt.TRAINING.PS_W, 'h': opt.TRAINING.PS_H, 'ori': opt.TRAINING.ORI})
+    testloader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=8, drop_last=False,
+                            pin_memory=True)
 
     # Model & Loss
     model = DocNLC()
@@ -47,7 +49,8 @@ def train():
     criterion_psnr = torch.nn.MSELoss()
 
     # Optimizer & Scheduler
-    optimizer_b = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=opt.OPTIM.LR_INITIAL, betas=(0.9, 0.999), eps=1e-8)
+    optimizer_b = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=opt.OPTIM.LR_INITIAL,
+                              betas=(0.9, 0.999), eps=1e-8)
     scheduler_b = optim.lr_scheduler.CosineAnnealingLR(optimizer_b, opt.OPTIM.NUM_EPOCHS, eta_min=opt.OPTIM.LR_MIN)
 
     trainloader, testloader = accelerator.prepare(trainloader, testloader)
@@ -56,7 +59,7 @@ def train():
 
     start_epoch = 1
     best_epoch = 1
-    best_rmse = 100
+    best_psnr = 0
     size = len(testloader)
     # training
     for epoch in range(start_epoch, opt.OPTIM.NUM_EPOCHS + 1):
@@ -106,10 +109,10 @@ def train():
             ssim /= size
             rmse /= size
 
-            if rmse < best_rmse:
+            if psnr > best_psnr:
                 # save model
                 best_epoch = epoch
-                best_rmse = rmse
+                best_psnr = psnr
                 save_checkpoint({
                     'state_dict': model.state_dict(),
                 }, epoch, opt.MODEL.SESSION, opt.TRAINING.SAVE_DIR)
@@ -119,11 +122,11 @@ def train():
                 "SSIM": ssim,
                 "RMSE": rmse
             }, step=epoch)
-            
+
             if accelerator.is_local_main_process:
                 print(
                     "epoch: {}, PSNR: {}, SSIM: {}, RMSE: {}, best RMSE: {}, best epoch: {}"
-                    .format(epoch, psnr, ssim, rmse, best_rmse, best_epoch))
+                    .format(epoch, psnr, ssim, rmse, best_psnr, best_epoch))
 
     accelerator.end_training()
 
