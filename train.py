@@ -4,7 +4,7 @@ import torch.optim as optim
 from accelerate import Accelerator
 from pytorch_msssim import SSIM
 from torch.utils.data import DataLoader
-from torchmetrics.functional import peak_signal_noise_ratio, mean_squared_error, structural_similarity_index_measure
+from torchmetrics.functional.image import peak_signal_noise_ratio, structural_similarity_index_measure
 from tqdm import tqdm
 
 from config import Config
@@ -24,12 +24,11 @@ def train():
 
     if accelerator.is_local_main_process:
         os.makedirs(opt.TRAINING.SAVE_DIR, exist_ok=True)
-    device = accelerator.device
 
     config = {
         "dataset": opt.TRAINING.TRAIN_DIR
     }
-    accelerator.init_trackers("shadow", config=config)
+    accelerator.init_trackers("docen", config=config)
 
     # Data Loader
     train_dir = opt.TRAINING.TRAIN_DIR
@@ -45,7 +44,6 @@ def train():
 
     # Model & Loss
     model = DocNLC()
-    criterion_ssim = SSIM(data_range=1, size_average=True, channel=1).to(device)
     criterion_psnr = torch.nn.MSELoss()
 
     # Optimizer & Scheduler
@@ -75,9 +73,9 @@ def train():
             res = model(inp)
 
             loss_psnr = criterion_psnr(res, tar)
-            loss_ssim = 1 - criterion_ssim(res, tar)
+            loss_ssim = 1 - structural_similarity_index_measure(res, tar)
 
-            train_loss = loss_psnr + 0.4 * loss_ssim
+            train_loss = loss_psnr + 0.2 * loss_ssim
 
             # backward
             accelerator.backward(train_loss)
@@ -90,7 +88,6 @@ def train():
             model.eval()
             psnr = 0
             ssim = 0
-            rmse = 0
             for idx, test_data in enumerate(tqdm(testloader, disable=not accelerator.is_local_main_process)):
                 # get the inputs; data is a list of [targets, inputs, filename]
                 inp = test_data[0].contiguous()
@@ -103,11 +100,9 @@ def train():
 
                 psnr += peak_signal_noise_ratio(res, tar, data_range=1)
                 ssim += structural_similarity_index_measure(res, tar, data_range=1)
-                rmse += mean_squared_error(torch.mul(res, 255), torch.mul(tar, 255), squared=False)
 
             psnr /= size
             ssim /= size
-            rmse /= size
 
             if psnr > best_psnr:
                 # save model
@@ -119,14 +114,13 @@ def train():
 
             accelerator.log({
                 "PSNR": psnr,
-                "SSIM": ssim,
-                "RMSE": rmse
+                "SSIM": ssim
             }, step=epoch)
 
             if accelerator.is_local_main_process:
                 print(
-                    "epoch: {}, PSNR: {}, SSIM: {}, RMSE: {}, best RMSE: {}, best epoch: {}"
-                    .format(epoch, psnr, ssim, rmse, best_psnr, best_epoch))
+                    "epoch: {}, PSNR: {}, SSIM: {}, best PSNR: {}, best epoch: {}"
+                    .format(epoch, psnr, ssim, best_psnr, best_epoch))
 
     accelerator.end_training()
 
