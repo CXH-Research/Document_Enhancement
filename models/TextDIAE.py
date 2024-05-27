@@ -192,8 +192,6 @@ class TextDIAE(nn.Module):
         # self.blur_to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
 
     def forward(self, img):
-        device = img.device
-
         # get patches
 
         patches = self.to_patch(img)
@@ -207,12 +205,12 @@ class TextDIAE(nn.Module):
         # calculate of patches needed to be masked, and get random indices, dividing it up for mask vs unmasked
 
         num_masked = int(self.masking_ratio * num_patches)
-        rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
+        rand_indices = torch.rand(batch, num_patches, device=img.device).argsort(dim=-1)
         masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
 
         # get the unmasked tokens to be encoded
 
-        batch_range = torch.arange(batch, device=device)[:, None]
+        batch_range = torch.arange(batch, device=img.device)[:, None]
         tokens = tokens[batch_range, unmasked_indices]
 
         # get the patches to be masked for the final reconstruction loss
@@ -246,10 +244,12 @@ class TextDIAE(nn.Module):
         mask_tokens = decoded_tokens[:, :num_masked]
         pred_pixel_values = self.clean_to_pixels(mask_tokens)
 
-        patches[batch_range, masked_indices] = pred_pixel_values
+        reconstructed_patches = patches.clone()
+        reconstructed_patches[batch_range, masked_indices] = pred_pixel_values
 
-        rec_images = rearrange(patches, 'b (h w) (p1 p2 c) -> b c (h p1) (w p2)', p1=self.patch_size,
-                               p2=self.patch_size, h=self.image_size[0] // self.patch_size)
+        # patches[batch_range, masked_indices] = pred_pixel_values
+
+        rec_images = rearrange(reconstructed_patches, 'b (h w) (p1 p2 c) -> b c (h p1) (w p2)', p1=self.patch_size, p2=self.patch_size, h=self.image_size[0] // self.patch_size)
 
         return rec_images
 
