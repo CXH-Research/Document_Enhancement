@@ -13,3 +13,4 @@ from .TextDIAE import TextDIAE
 from .UDoc_GAN import UDoc_GAN
 from .dplinknet import DPLinkNet34
 from .illtrtemplate import illtrtemplate
+from .DocTrPP import DocTrPP

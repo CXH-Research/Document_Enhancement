@@ -416,7 +416,7 @@ class DocTrPP(nn.Module):
         for i in self.up_layer:
             self.__setattr__(i, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True))
 
-        self.query_embed = nn.Embedding(81, self.hidden_dim)
+        self.query_embed = nn.Embedding(64, self.hidden_dim)
 
         self.update_block = UpdateBlock(self.hidden_dim)
 
@@ -490,7 +490,7 @@ class DocTrPP(nn.Module):
 
 
 if __name__ == '__main__':
-    inp = torch.randn(1, 3, 288, 288).cuda()
+    inp = torch.randn(1, 3, 256, 256).cuda()
     model = DocTrPP().cuda()
     res = model(inp)
     print(res.shape)
