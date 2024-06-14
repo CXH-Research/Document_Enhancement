@@ -448,7 +448,7 @@ class DocTrPP(nn.Module):
         return img_blurred
 
     def forward(self, image1):
-        _, _, h, w = image1.shape
+        b, _, h, w = image1.shape
 
         fmap = self.fnet(image1)
         fmap = torch.relu(fmap)
@@ -482,7 +482,7 @@ class DocTrPP(nn.Module):
         bm0 = self.blur(bm0, 3)
         bm1 = self.blur(bm1, 3)
 
-        lbl = torch.cat((bm0, bm1), dim=1).permute(0, 2, 3, 1)
+        lbl = torch.cat((bm0, bm1), dim=1).permute(0, 2, 3, 1).repeat(b, 1, 1, 1)
 
         out = F.grid_sample(image1, lbl, align_corners=True)
 
@@ -490,7 +490,7 @@ class DocTrPP(nn.Module):
 
 
 if __name__ == '__main__':
-    inp = torch.randn(1, 3, 256, 256).cuda()
+    inp = torch.randn(4, 3, 256, 256).cuda()
     model = DocTrPP().cuda()
     res = model(inp)
     print(res.shape)
