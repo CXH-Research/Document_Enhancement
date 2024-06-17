@@ -14,3 +14,5 @@ from .UDoc_GAN import UDoc_GAN
 from .dplinknet import DPLinkNet34
 from .illtrtemplate import illtrtemplate
 from .DocTrPP import DocTrPP
+from .FSENet import FSENet
+from .ShadowFormer import ShadowFormer
