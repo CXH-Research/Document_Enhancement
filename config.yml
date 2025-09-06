@@ -1,12 +1,14 @@
 VERBOSE: True
 
 MODEL:
-  SESSION: 'DocNLC'  # Define your current task here
+  MODEL_NAME: 'AECRNet'
+  SESSION: 'DesmokeData'
+  TARGET: 'target'
 
 # Optimization arguments.
 OPTIM:
-  BATCH_SIZE: 1
-  NUM_EPOCHS: 300
+  BATCH_SIZE: 8
+  NUM_EPOCHS: 200
   LR_INITIAL: 2e-4
   LR_MIN: 1e-6
   SEED: 3407
@@ -17,11 +19,9 @@ TRAINING:
   RESUME: False
   PS_W: 256
   PS_H: 256
-  TRAIN_DIR: '../dataset/BIN/train/' # path to training data
-  VAL_DIR: '../dataset/BIN/test/'    # path to validation data
-  SAVE_DIR: './checkpoints/'     # path to save models and images
-  ORI: False
+  SAVE_DIR: './checkpoints/'          # path to save models and images
 
 TESTING:
-  WEIGHT: './checkpoints/best.pth'
+  TARGET: 'target'
+  WEIGHT: './filmnet_hdr+.pth'
   SAVE_IMAGES: True

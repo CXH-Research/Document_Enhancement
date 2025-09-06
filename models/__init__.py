@@ -14,5 +14,24 @@ from .UDoc_GAN import UDoc_GAN
 from .dplinknet import DPLinkNet34
 from .illtrtemplate import illtrtemplate
 from .DocTrPP import DocTrPP
-from .FSENet import FSENet
-from .ShadowFormer import ShadowFormer
+from .DocRes import DocRes
+
+model_registry = {
+    "BinFormer": BinFormer,
+    "DEGAN": DEGAN,
+    "DeepOtsu": DeepOtsu,
+    "DocEnTR": DocEnTR,
+    "DocNLC": DocNLC,
+    "DocProj": DocProj,
+    "DocTr": DocTr,
+    "GAN_HTR": GAN_HTR,
+    "GCDRNet": GCDRNet,
+    "SAE": SAE,
+    "SauvolaNet": SauvolaNet,
+    "TextDIAE": TextDIAE,
+    "UDoc_GAN": UDoc_GAN,
+    "DPLinkNet34": DPLinkNet34,
+    "illtrtemplate": illtrtemplate,
+    "DocTrPP": DocTrPP,
+    "DocRes": DocRes,
+}

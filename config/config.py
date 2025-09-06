@@ -59,13 +59,15 @@ class Config(object):
         self._C.VERBOSE = False
 
         self._C.MODEL = CN()
+        self._C.MODEL.MODEL_NAME = 'Halation'
         self._C.MODEL.SESSION = 'LUT'
-        self._C.MODEL.FILM = 'target'
+        self._C.MODEL.INPUT = 'input'
+        self._C.MODEL.TARGET = 'target'
 
         self._C.OPTIM = CN()
         self._C.OPTIM.BATCH_SIZE = 1
         self._C.OPTIM.SEED = 3407
-        self._C.OPTIM.NUM_EPOCHS = 100
+        self._C.OPTIM.NUM_EPOCHS = 300
         self._C.OPTIM.NEPOCH_DECAY = [100]
         self._C.OPTIM.LR_INITIAL = 0.0002
         self._C.OPTIM.LR_MIN = 0.0002
@@ -73,18 +75,21 @@ class Config(object):
         self._C.OPTIM.WANDB = False
 
         self._C.TRAINING = CN()
-        self._C.TRAINING.VAL_AFTER_EVERY = 3
+        self._C.TRAINING.VAL_AFTER_EVERY = 1
         self._C.TRAINING.RESUME = False
-        self._C.TRAINING.TRAIN_DIR = 'images_dir/train'
-        self._C.TRAINING.VAL_DIR = 'images_dir/val'
+        self._C.TRAINING.TRAIN_DIR = '../dataset/hdrplus/train'
+        self._C.TRAINING.VAL_DIR = '../dataset/hdrplus/test'
         self._C.TRAINING.SAVE_DIR = 'checkpoints'
-        self._C.TRAINING.PS_W = 64
-        self._C.TRAINING.PS_H = 64
-        self._C.TRAINING.ORI = False
+        self._C.TRAINING.PS_W = 640
+        self._C.TRAINING.PS_H = 480
 
         self._C.TESTING = CN()
+        self._C.TESTING.INPUT = 'input'
+        self._C.TESTING.TARGET = 'target'
         self._C.TESTING.WEIGHT = None
+        self._C.TESTING.VAL_DIR = '../dataset/hdrplus/test'
         self._C.TESTING.SAVE_IMAGES = False
+        self._C.TESTING.RESULT_DIR = None
 
         # Override parameter values from YAML file first, then from override list.
         self._C.merge_from_file(config_yaml)
